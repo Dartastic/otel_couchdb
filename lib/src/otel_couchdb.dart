@@ -1,11 +1,12 @@
-// Licensed under the Dartastic Pro Software License Agreement.
+// Licensed under the Apache License, Version 2.0
 // Copyright 2025-2026 Mindful Software LLC d/b/a Dartastic.io, All rights reserved.
 
-import 'package:dartastic_opentelemetry/dartastic_opentelemetry.dart';
+import 'package:dartastic_opentelemetry_api/dartastic_opentelemetry_api.dart';
 
 import 'otel_couchdb_suppression.dart';
 
 class CouchDBResult {
+  /// Creates a result.
   const CouchDBResult({
     this.database,
     this.documentId,
@@ -29,8 +30,13 @@ class CouchDBResult {
   final String? errorMessage;
 }
 
+/// What a traced call returned: the value for the caller plus fields
+/// recorded on the span.
 class CouchDBCallResult<T> {
+  /// Creates a call result.
   const CouchDBCallResult({required this.value, this.result});
+
+  /// The value returned to the caller.
   final T value;
   final CouchDBResult? result;
 }
@@ -38,59 +44,60 @@ class CouchDBCallResult<T> {
 Future<T> tracedCouchDB<T>({
   required String operation,
   required Future<CouchDBCallResult<T>> Function() invoke,
-  Tracer? tracer,
+  APITracer? tracer,
 }) async {
   if (couchDBInstrumentationSuppressed()) {
     final r = await invoke();
     return r.value;
   }
-  final t = tracer ?? OTel.tracerProvider().getTracer('otel_couchdb');
+  final t = tracer ?? OTelAPI.tracerProvider().getTracer('otel_couchdb');
   final span = t.startSpan('couchdb $operation', kind: SpanKind.client);
   try {
-    span.addAttributes(
-        OTel.attributes([OTel.attributeString('db.system.name', 'couchdb')]));
+    span.addAttributes(OTelAPI.attributes(
+        [OTelAPI.attributeString('db.system.name', 'couchdb')]));
     final r = await invoke();
     final res = r.result;
     if (res != null) {
       if (res.database != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('db.namespace', res.database!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('db.namespace', res.database!)]));
       }
       if (res.documentId != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('couchdb.document.id', res.documentId!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('couchdb.document.id', res.documentId!)]));
       }
       if (res.revision != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('couchdb.revision', res.revision!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('couchdb.revision', res.revision!)]));
       }
       if (res.designDoc != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('couchdb.design_doc', res.designDoc!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('couchdb.design_doc', res.designDoc!)]));
       }
       if (res.viewName != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('couchdb.view', res.viewName!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('couchdb.view', res.viewName!)]));
       }
       if (res.rowsAffected != null) {
-        span.addAttributes(OTel.attributes([
-          OTel.attributeInt('db.response.returned_rows', res.rowsAffected!)
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeInt('db.response.returned_rows', res.rowsAffected!)
         ]));
       }
       if (res.statusCode != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeInt('http.response.status_code', res.statusCode!)]));
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeInt('http.response.status_code', res.statusCode!)
+        ]));
       }
       if (res.errorCode != null) {
-        span.addAttributes(OTel.attributes(
-            [OTel.attributeString('couchdb.error.code', res.errorCode!)]));
+        span.addAttributes(OTelAPI.attributes(
+            [OTelAPI.attributeString('couchdb.error.code', res.errorCode!)]));
       }
       final fail = res.errorCode != null ||
           (res.statusCode != null && res.statusCode! >= 400);
       if (fail) {
-        span.addAttributes(OTel.attributes([
-          OTel.attributeString(
-            ErrorResource.errorType.key,
+        span.addAttributes(OTelAPI.attributes([
+          OTelAPI.attributeString(
+            ErrorAttributes.errorType.key,
             res.errorCode ?? 'couchdb.error',
           )
         ]));
